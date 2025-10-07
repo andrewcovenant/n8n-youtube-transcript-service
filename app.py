@@ -67,8 +67,12 @@ def extract_transcript(video_id: str, language: str = "en") -> tuple[bool, Optio
         Tuple of (success, transcript_text, raw_segments)
     """
     try:
-        # Fetch transcript
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=[language])
+        # Create API instance and fetch transcript
+        api = YouTubeTranscriptApi()
+        fetched_transcript = api.fetch(video_id, languages=[language])
+        
+        # Extract the transcript list from the FetchedTranscript object
+        transcript_list = fetched_transcript.to_raw_data()
         
         # Combine text segments
         transcript_text = " ".join([segment["text"] for segment in transcript_list])
@@ -80,8 +84,9 @@ def extract_transcript(video_id: str, language: str = "en") -> tuple[bool, Optio
         return False, None, None
     
     except Exception as e:
-        logger.error(f"Unexpected error fetching transcript for {video_id}: {str(e)}")
-        raise
+        # Catch all other exceptions (including XML parsing errors from YouTube API)
+        logger.warning(f"Error fetching transcript for video {video_id}: {str(e)}")
+        return False, None, None
 
 
 # API Endpoints
@@ -109,30 +114,25 @@ async def get_transcript_simple(
     Returns:
         Simple transcript response with combined text
     """
-    try:
-        success, transcript_text, _ = extract_transcript(video_id, lang)
-        
-        if success:
-            return SimpleTranscriptResponse(
-                success=True,
-                videoId=video_id,
-                transcript=transcript_text,
-                hasTranscript=True
-            )
-        else:
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "success": False,
-                    "videoId": video_id,
-                    "transcript": None,
-                    "hasTranscript": False
-                }
-            )
+    success, transcript_text, _ = extract_transcript(video_id, lang)
     
-    except Exception as e:
-        logger.error(f"Error processing request for video {video_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    if success:
+        return SimpleTranscriptResponse(
+            success=True,
+            videoId=video_id,
+            transcript=transcript_text,
+            hasTranscript=True
+        )
+    else:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "videoId": video_id,
+                "transcript": None,
+                "hasTranscript": False
+            }
+        )
 
 
 @app.post("/transcript", response_model=DetailedTranscriptResponse)
@@ -146,45 +146,40 @@ async def get_transcript_detailed(request: TranscriptRequest):
     Returns:
         Detailed transcript response with raw segments and timing information
     """
-    try:
-        success, transcript_text, raw_segments = extract_transcript(
-            request.video_id,
-            request.language or "en"
-        )
-        
-        if success:
-            # Convert raw segments to proper format
-            formatted_segments = [
-                TranscriptSegment(
-                    text=seg["text"],
-                    start=seg["start"],
-                    duration=seg["duration"]
-                )
-                for seg in raw_segments
-            ]
-            
-            return DetailedTranscriptResponse(
-                success=True,
-                videoId=request.video_id,
-                transcript=transcript_text,
-                raw=formatted_segments,
-                language=request.language or "en"
-            )
-        else:
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "success": False,
-                    "videoId": request.video_id,
-                    "transcript": None,
-                    "raw": None,
-                    "language": request.language or "en"
-                }
-            )
+    success, transcript_text, raw_segments = extract_transcript(
+        request.video_id,
+        request.language or "en"
+    )
     
-    except Exception as e:
-        logger.error(f"Error processing request for video {request.video_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    if success:
+        # Convert raw segments to proper format
+        formatted_segments = [
+            TranscriptSegment(
+                text=seg["text"],
+                start=seg["start"],
+                duration=seg["duration"]
+            )
+            for seg in raw_segments
+        ]
+        
+        return DetailedTranscriptResponse(
+            success=True,
+            videoId=request.video_id,
+            transcript=transcript_text,
+            raw=formatted_segments,
+            language=request.language or "en"
+        )
+    else:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "videoId": request.video_id,
+                "transcript": None,
+                "raw": None,
+                "language": request.language or "en"
+            }
+        )
 
 
 # Root endpoint

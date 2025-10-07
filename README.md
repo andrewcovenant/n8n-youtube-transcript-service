@@ -19,7 +19,7 @@ A lightweight microservice that extracts transcripts from YouTube videos using t
 | Python                 | 3.11    | Runtime environment                  |
 | FastAPI                | 0.104.1 | Web framework for API endpoints      |
 | Uvicorn                | 0.24.0  | ASGI server to run FastAPI           |
-| youtube-transcript-api | 0.6.1   | Library to fetch YouTube transcripts |
+| youtube-transcript-api | 1.2.2   | Library to fetch YouTube transcripts |
 | Docker                 | 24.x+   | Containerization                     |
 | Docker Compose         | 2.x+    | Container orchestration              |
 
@@ -218,21 +218,29 @@ curl -X POST http://localhost:8000/transcript \
 
 ### Using Docker Compose
 
+> **Note:** Depending on your Docker version, use either `docker compose` (v2+) or `docker-compose` (v1).
+
 1. **Start the service:**
 
    ```bash
+   # Docker Compose v2 (plugin)
+   docker compose up -d
+
+   # Docker Compose v1 (standalone)
    docker-compose up -d
    ```
 
 2. **View logs:**
 
    ```bash
-   docker-compose logs -f
+   docker compose logs -f   # v2
+   docker-compose logs -f   # v1
    ```
 
 3. **Stop the service:**
    ```bash
-   docker-compose down
+   docker compose down      # v2
+   docker-compose down      # v1
    ```
 
 ---
@@ -390,7 +398,10 @@ The service logs important information:
 Logs are output to stdout and can be viewed with:
 
 ```bash
-# Docker Compose
+# Docker Compose v2
+docker compose logs -f
+
+# Docker Compose v1
 docker-compose logs -f
 
 # Docker
@@ -430,7 +441,9 @@ git clone <repository-url>
 cd n8n-youtube-transcript-service
 
 # Run with Docker Compose (Recommended)
-docker-compose up -d
+docker compose up -d  # v2
+# OR
+docker-compose up -d  # v1
 
 # Or run locally
 pip install -r requirements.txt
