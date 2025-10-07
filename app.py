@@ -15,6 +15,9 @@ from youtube_transcript_api._errors import (
     InvalidVideoId
 )
 import logging
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -55,9 +58,43 @@ class SimpleTranscriptResponse(BaseModel):
 
 
 # Helper Functions
+def create_browser_session():
+    """
+    Create a requests session that mimics a real browser
+    """
+    session = requests.Session()
+    
+    # Add retry strategy
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    
+    # Browser-like headers
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0'
+    })
+    
+    return session
+
+
 def extract_transcript(video_id: str, language: str = "en") -> tuple[bool, Optional[str], Optional[List[Dict[str, Any]]]]:
     """
-    Extract transcript from YouTube video
+    Extract transcript from YouTube video with browser mimicking
     
     Args:
         video_id: YouTube video ID
@@ -67,17 +104,37 @@ def extract_transcript(video_id: str, language: str = "en") -> tuple[bool, Optio
         Tuple of (success, transcript_text, raw_segments)
     """
     try:
-        # Create API instance and fetch transcript
-        api = YouTubeTranscriptApi()
-        fetched_transcript = api.fetch(video_id, languages=[language])
+        # Create a browser-like session
+        session = create_browser_session()
         
-        # Extract the transcript list from the FetchedTranscript object
-        transcript_list = fetched_transcript.to_raw_data()
+        # Monkey-patch the session into the YouTubeTranscriptApi
+        # This makes all requests look like they're coming from a real browser
+        import youtube_transcript_api._api as yt_api
+        original_get = requests.get
         
-        # Combine text segments
-        transcript_text = " ".join([segment["text"] for segment in transcript_list])
+        def patched_get(url, **kwargs):
+            kwargs['headers'] = session.headers
+            kwargs['timeout'] = kwargs.get('timeout', 10)
+            return original_get(url, **kwargs)
         
-        return True, transcript_text, transcript_list
+        # Temporarily replace requests.get with our patched version
+        requests.get = patched_get
+        
+        try:
+            # Create API instance and fetch transcript
+            api = YouTubeTranscriptApi()
+            fetched_transcript = api.fetch(video_id, languages=[language])
+            
+            # Extract the transcript list from the FetchedTranscript object
+            transcript_list = fetched_transcript.to_raw_data()
+            
+            # Combine text segments
+            transcript_text = " ".join([segment["text"] for segment in transcript_list])
+            
+            return True, transcript_text, transcript_list
+        finally:
+            # Restore original requests.get
+            requests.get = original_get
     
     except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable, InvalidVideoId) as e:
         logger.warning(f"Could not fetch transcript for video {video_id}: {str(e)}")
