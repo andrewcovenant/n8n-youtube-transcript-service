@@ -7,6 +7,11 @@ services:
     environment:
       - PORT=8000
       - LOG_LEVEL=info
+      # Webshare Proxy Configuration (uncomment to bypass IP bans on VPS)
+      # Get credentials from https://webshare.io (Residential proxies required)
+      - WEBSHARE_PROXY_USERNAME=faoipeva
+      - WEBSHARE_PROXY_PASSWORD=gtkupdk84z6x
+      - PROXY_LOCATIONS=us,de # Optional: Filter by country codes
     restart: unless-stopped
     healthcheck:
       test:

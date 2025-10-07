@@ -296,6 +296,30 @@ You can configure the service using environment variables:
 | `PORT`      | 8000    | Server port                                     |
 | `LOG_LEVEL` | info    | Logging verbosity (debug, info, warning, error) |
 
+### Proxy Configuration (For VPS Deployments)
+
+If you're getting blocked on your VPS (AWS, Google Cloud, Azure, Hostinger), use **Webshare rotating residential proxies**:
+
+| Variable                  | Required | Description                                    |
+| ------------------------- | -------- | ---------------------------------------------- |
+| `WEBSHARE_PROXY_USERNAME` | Yes      | Your Webshare proxy username                   |
+| `WEBSHARE_PROXY_PASSWORD` | Yes      | Your Webshare proxy password                   |
+| `PROXY_LOCATIONS`         | No       | Country codes (e.g., "us,de,gb") to filter IPs |
+
+**Setup Steps:**
+
+1. Create account at [webshare.io](https://webshare.io)
+2. Purchase **"Residential"** proxy package (NOT "Proxy Server" or "Static Residential")
+3. Get credentials from [Webshare Proxy Settings](https://proxy2.webshare.io/proxy/settings)
+4. Add to `docker-compose.yml`:
+   ```yaml
+   environment:
+     - WEBSHARE_PROXY_USERNAME=your_username
+     - WEBSHARE_PROXY_PASSWORD=your_password
+     - PROXY_LOCATIONS=us # Optional: Use US IPs only
+   ```
+5. Restart: `docker compose down && docker compose up -d`
+
 ---
 
 ## 🔗 Integration with n8n
@@ -366,7 +390,8 @@ Once the service is running, you can access the interactive API documentation:
 ### Quick Test Commands
 
 ```bash
-# Test health endpoint
+#
+Test health endpoint
 curl http://localhost:8000/health
 
 # Test with a valid video
