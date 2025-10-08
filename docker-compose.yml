@@ -4,6 +4,10 @@ services:
     container_name: youtube-transcript-service
     ports:
       - "8000:8000"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     environment:
       - PORT=8000
       - LOG_LEVEL=info
