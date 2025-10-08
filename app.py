@@ -56,6 +56,21 @@ class SimpleTranscriptResponse(BaseModel):
     hasTranscript: bool
 
 
+class TimestampedSegment(BaseModel):
+    text: str
+    start: float
+    end: float
+    startFormatted: str
+    endFormatted: str
+
+
+class TimestampedTranscriptResponse(BaseModel):
+    success: bool
+    videoId: str
+    segments: Optional[List[TimestampedSegment]]
+    language: Optional[str]
+
+
 # Proxy configuration (optional - set via environment variables)
 PROXY_USERNAME = os.getenv("WEBSHARE_PROXY_USERNAME", "")
 PROXY_PASSWORD = os.getenv("WEBSHARE_PROXY_PASSWORD", "")
@@ -90,6 +105,23 @@ def get_api_instance():
 
 
 # Helper Functions
+def format_timestamp(seconds: float) -> str:
+    """
+    Convert seconds to HH:MM:SS.mmm format
+    
+    Args:
+        seconds: Time in seconds
+    
+    Returns:
+        Formatted timestamp string
+    """
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = seconds % 60
+    
+    return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
+
+
 def extract_transcript(video_id: str, language: str = "en") -> tuple[bool, Optional[str], Optional[List[Dict[str, Any]]]]:
     """
     Extract transcript from YouTube video
@@ -217,6 +249,54 @@ async def get_transcript_detailed(request: TranscriptRequest):
         )
 
 
+@app.get("/transcript/{video_id}/timestamps", response_model=TimestampedTranscriptResponse)
+async def get_transcript_with_timestamps(
+    video_id: str,
+    lang: Optional[str] = Query("en", description="Language code for transcript")
+):
+    """
+    Get YouTube video transcript with formatted timestamps
+    
+    Args:
+        video_id: YouTube video ID
+        lang: Language code (default: "en")
+    
+    Returns:
+        Transcript segments with start/end times in both seconds and formatted strings (HH:MM:SS.mmm)
+    """
+    success, _, raw_segments = extract_transcript(video_id, lang)
+    
+    if success:
+        # Convert raw segments to timestamped format
+        timestamped_segments = [
+            TimestampedSegment(
+                text=seg["text"],
+                start=seg["start"],
+                end=seg["start"] + seg["duration"],
+                startFormatted=format_timestamp(seg["start"]),
+                endFormatted=format_timestamp(seg["start"] + seg["duration"])
+            )
+            for seg in raw_segments
+        ]
+        
+        return TimestampedTranscriptResponse(
+            success=True,
+            videoId=video_id,
+            segments=timestamped_segments,
+            language=lang
+        )
+    else:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "videoId": video_id,
+                "segments": None,
+                "language": lang
+            }
+        )
+
+
 # Root endpoint
 @app.get("/")
 async def root():
@@ -229,7 +309,8 @@ async def root():
         "endpoints": {
             "health": "/health",
             "simple_transcript": "/transcript/{video_id}?lang=en",
-            "detailed_transcript": "/transcript (POST)"
+            "detailed_transcript": "/transcript (POST)",
+            "timestamped_transcript": "/transcript/{video_id}/timestamps?lang=en"
         }
     }
 

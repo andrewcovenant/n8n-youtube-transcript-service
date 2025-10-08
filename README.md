@@ -7,6 +7,7 @@ A lightweight microservice that extracts transcripts from YouTube videos using t
 - ✅ Extract YouTube video transcripts with a simple API
 - ✅ Support for multiple languages
 - ✅ Detailed transcript with timing information
+- ✅ Formatted timestamps (HH:MM:SS.mmm) for each segment
 - ✅ Docker containerization for easy deployment
 - ✅ Health check endpoint for monitoring
 - ✅ Comprehensive error handling
@@ -150,6 +151,73 @@ curl -X POST http://localhost:8000/transcript \
   -H "Content-Type: application/json" \
   -d '{"video_id": "dQw4w9WgXcQ", "language": "en"}'
 ```
+
+---
+
+### 4. Get Transcript with Timestamps
+
+Get a YouTube video transcript with formatted timestamps for each segment.
+
+**Endpoint:** `GET /transcript/{video_id}/timestamps`
+
+**Query Parameters:**
+
+- `lang` (optional, default: "en") - Language code for transcript
+
+**Response (Success):**
+
+```json
+{
+  "success": true,
+  "videoId": "dQw4w9WgXcQ",
+  "segments": [
+    {
+      "text": "♪ We're no strangers to love ♪",
+      "start": 18.64,
+      "end": 21.88,
+      "startFormatted": "00:00:18.640",
+      "endFormatted": "00:00:21.880"
+    },
+    {
+      "text": "♪ You know the rules and so do I ♪",
+      "start": 22.64,
+      "end": 26.96,
+      "startFormatted": "00:00:22.640",
+      "endFormatted": "00:00:26.960"
+    }
+  ],
+  "language": "en"
+}
+```
+
+**Response (Error - 404):**
+
+```json
+{
+  "success": false,
+  "videoId": "invalidID123",
+  "segments": null,
+  "language": "en"
+}
+```
+
+**Examples:**
+
+```bash
+# English transcript with timestamps (default)
+curl http://localhost:8000/transcript/dQw4w9WgXcQ/timestamps
+
+# Spanish transcript with timestamps
+curl http://localhost:8000/transcript/dQw4w9WgXcQ/timestamps?lang=es
+```
+
+**Response Fields:**
+
+- `start`: Start time in seconds (float)
+- `end`: End time in seconds (float)
+- `startFormatted`: Start time in HH:MM:SS.mmm format
+- `endFormatted`: End time in HH:MM:SS.mmm format
+- `text`: The transcript text for this segment
 
 ---
 
@@ -390,8 +458,7 @@ Once the service is running, you can access the interactive API documentation:
 ### Quick Test Commands
 
 ```bash
-#
-Test health endpoint
+# Test health endpoint
 curl http://localhost:8000/health
 
 # Test with a valid video
@@ -404,6 +471,9 @@ curl http://localhost:8000/transcript/dQw4w9WgXcQ?lang=es
 curl -X POST http://localhost:8000/transcript \
   -H "Content-Type: application/json" \
   -d '{"video_id": "dQw4w9WgXcQ", "language": "en"}'
+
+# Test timestamps endpoint
+curl http://localhost:8000/transcript/dQw4w9WgXcQ/timestamps
 
 # Test with invalid video ID
 curl http://localhost:8000/transcript/invalidID123
